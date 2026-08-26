@@ -1,0 +1,114 @@
+package com.bgsm.app.data.firebase
+
+import android.util.Log
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.FirebaseAuthException
+import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
+import com.google.firebase.auth.FirebaseAuthInvalidUserException
+import com.google.firebase.auth.FirebaseAuthUserCollisionException
+import com.google.firebase.auth.FirebaseAuthWeakPasswordException
+import com.google.firebase.firestore.FirebaseFirestoreException
+import org.json.JSONArray
+import org.json.JSONObject
+
+enum class OperationType(val value: String) {
+    CREATE("create"),
+    UPDATE("update"),
+    DELETE("delete"),
+    LIST("list"),
+    GET("get"),
+    WRITE("write"),
+}
+
+object FirebaseErrorHandler {
+
+    private const val TAG = "[com.bgsm.app] FirebaseError"
+
+    fun handleFirestoreError(exception: Exception, operationType: OperationType, path: String?): String {
+        val auth = FirebaseAuth.getInstance()
+        val currentUser = auth.currentUser
+
+        val providerInfoList = currentUser?.providerData?.map { provider ->
+            JSONObject().apply {
+                put("providerId", provider.providerId)
+                put("email", provider.email)
+            }
+        } ?: emptyList()
+
+        val authInfoJson = JSONObject().apply {
+            put("userId", currentUser?.uid)
+            put("email", currentUser?.email)
+            put("emailVerified", currentUser?.isEmailVerified)
+            put("tenantId", currentUser?.tenantId)
+            put("providerInfo", JSONArray(providerInfoList))
+        }
+
+        val errorInfoJson = JSONObject().apply {
+            put("error", exception.message ?: exception.toString())
+            put("operationType", operationType.value)
+            put("path", path)
+            put("authInfo", authInfoJson)
+        }
+
+        val jsonString = errorInfoJson.toString()
+        Log.e(TAG, "Firestore Structured Error: $jsonString", exception)
+        return getFriendlyErrorMessage(exception)
+    }
+
+    fun getFriendlyErrorMessage(throwable: Throwable?): String {
+        if (throwable == null) return "An unknown error occurred. Please try again."
+
+        val message = throwable.message.orEmpty().lowercase()
+
+        return when {
+            throwable is FirebaseAuthWeakPasswordException ->
+                "The password is too weak. Please use at least 6 characters."
+
+            throwable is FirebaseAuthInvalidCredentialsException ->
+                "Invalid email or password. Please verify your credentials."
+
+            throwable is FirebaseAuthUserCollisionException ->
+                "An account with this email address already exists. Please sign in instead."
+
+            throwable is FirebaseAuthInvalidUserException ->
+                "No account found with this email, or the account has been disabled."
+
+            throwable is FirebaseAuthException -> {
+                when (throwable.errorCode) {
+                    "ERROR_INVALID_EMAIL" -> "Please enter a valid email address."
+                    "ERROR_WRONG_PASSWORD" -> "Incorrect password. Please try again."
+                    "ERROR_USER_NOT_FOUND" -> "No user found with this email."
+                    "ERROR_USER_DISABLED" -> "This account has been suspended or disabled."
+                    "ERROR_TOO_MANY_REQUESTS" -> "Too many attempts. Please wait a few minutes before trying again."
+                    "ERROR_OPERATION_NOT_ALLOWED" -> "Sign in method is not enabled. Please contact support."
+                    else -> "Authentication failed: ${throwable.localizedMessage ?: "Please try again."}"
+                }
+            }
+
+            throwable is FirebaseFirestoreException -> {
+                when (throwable.code) {
+                    FirebaseFirestoreException.Code.PERMISSION_DENIED ->
+                        "Permission denied. You do not have access to this resource."
+                    FirebaseFirestoreException.Code.UNAVAILABLE ->
+                        "Service temporarily unavailable. Please check your internet connection."
+                    FirebaseFirestoreException.Code.NOT_FOUND ->
+                        "Requested profile or document was not found."
+                    FirebaseFirestoreException.Code.ALREADY_EXISTS ->
+                        "Document already exists."
+                    else -> "Database error: ${throwable.localizedMessage ?: "Operation failed."}"
+                }
+            }
+
+            message.contains("network") || message.contains("unable to resolve host") || message.contains("timeout") ->
+                "Network connection issue. Please check your internet and try again."
+
+            message.contains("credential") || message.contains("canceled") || message.contains("cancelled") ->
+                "Sign-in was cancelled."
+
+            message.contains("missing google-services") || message.contains("configuration") ->
+                "Firebase configuration error. Please verify project settings."
+
+            else -> throwable.localizedMessage ?: "Operation failed. Please try again."
+        }
+    }
+}

@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">BGSM — Battleground Social Media</string>
+    <string name="app_tagline">The Ultimate Gaming &amp; Clan Network</string>
+    <string name="login_title">Welcome Back</string>
+    <string name="register_title">Join the Battleground</string>
+    <string name="forgot_password_title">Reset Password</string>
+    <string name="default_web_client_id">1038538159585-placeholder.apps.googleusercontent.com</string>
+</resources>

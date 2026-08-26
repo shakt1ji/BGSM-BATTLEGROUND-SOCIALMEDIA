@@ -1,0 +1,7 @@
+{
+  "name": "BGSM — Battleground Social Media",
+  "description": "Battleground Social Media — Clans, gaming network, real-time social connections and battlegrounds.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+

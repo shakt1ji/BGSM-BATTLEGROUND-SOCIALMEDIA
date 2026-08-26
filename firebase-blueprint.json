@@ -1,0 +1,84 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile containing identity, active clan, and social details",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Firebase Auth UID" },
+        "displayName": { "type": "string", "description": "User display name" },
+        "username": { "type": "string", "description": "Unique username handle" },
+        "email": { "type": "string", "description": "User email address" },
+        "photoUrl": { "type": "string", "description": "Avatar photo URL" },
+        "bio": { "type": "string", "description": "User biography" },
+        "interests": {
+          "type": "array",
+          "description": "List of gaming and social interests"
+        },
+        "activeClanId": { "type": "string", "description": "Active Clan ID (One User = One Clan)" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Last update timestamp" },
+        "joinedPlatformAt": { "type": "string", "format": "date-time", "description": "Platform registration timestamp" }
+      },
+      "required": ["uid", "displayName", "email"]
+    },
+    "Clan": {
+      "title": "Clan",
+      "description": "Gaming clan entity",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "tag": { "type": "string" },
+        "description": { "type": "string" },
+        "leaderUid": { "type": "string" },
+        "memberCount": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "leaderUid"]
+    },
+    "ClanMember": {
+      "title": "ClanMember",
+      "description": "Clan membership entity",
+      "type": "object",
+      "properties": {
+        "clanId": { "type": "string" },
+        "uid": { "type": "string" },
+        "role": { "type": "string" },
+        "joinedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["clanId", "uid", "role"]
+    },
+    "Post": {
+      "title": "Post",
+      "description": "Social feed post entity",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "authorUid": { "type": "string" },
+        "authorName": { "type": "string" },
+        "content": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "authorUid", "content"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User profile document storing authentication identity and preferences"
+    },
+    "/clans/{clanId}": {
+      "schema": "Clan",
+      "description": "Clan organization document"
+    },
+    "/clan_members/{memberId}": {
+      "schema": "ClanMember",
+      "description": "Clan membership record"
+    },
+    "/posts/{postId}": {
+      "schema": "Post",
+      "description": "Social timeline post"
+    }
+  }
+}

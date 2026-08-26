@@ -1,0 +1,144 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default deny all access
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    // Future extension helpers
+    function isClanMember(clanId) {
+      return isSignedIn() && exists(/databases/$(database)/documents/clan_members/$(clanId + '_' + request.auth.uid));
+    }
+
+    // Validation for UserProfile
+    function isValidUserProfile(data) {
+      return data.uid is string &&
+             data.uid == request.auth.uid &&
+             data.displayName is string &&
+             data.displayName.size() >= 1 &&
+             data.displayName.size() <= 100 &&
+             data.email is string &&
+             data.email.size() >= 3 &&
+             data.email.size() <= 150 &&
+             (!('username' in data) || data.username == null || (data.username is string && data.username.size() <= 50)) &&
+             (!('photoUrl' in data) || data.photoUrl == null || (data.photoUrl is string && data.photoUrl.size() <= 1000)) &&
+             (!('bio' in data) || data.bio == null || (data.bio is string && data.bio.size() <= 500)) &&
+             (!('interests' in data) || data.interests == null || (data.interests is list && data.interests.size() <= 20)) &&
+             (!('activeClanId' in data) || data.activeClanId == null || (data.activeClanId is string && data.activeClanId.size() <= 128)) &&
+             (!('createdAt' in data) || data.createdAt == null || data.createdAt is timestamp) &&
+             (!('updatedAt' in data) || data.updatedAt == null || data.updatedAt is timestamp) &&
+             (!('joinedPlatformAt' in data) || data.joinedPlatformAt == null || data.joinedPlatformAt is timestamp);
+    }
+
+    // Users collection
+    match /users/{userId} {
+      // Any authenticated user can read public profile of other users
+      allow get: if isSignedIn() && isValidId(userId);
+      // Deny bulk list scanning
+      allow list: if false;
+
+      // Only the user themselves can create their own profile document
+      allow create: if isOwner(userId) &&
+                       isValidId(userId) &&
+                       incoming().uid == userId &&
+                       isValidUserProfile(incoming());
+
+      // Only the user themselves can update their profile fields (cannot change uid or createdAt)
+      allow update: if isOwner(userId) &&
+                       isValidId(userId) &&
+                       incoming().uid == existing().uid &&
+                       (!('createdAt' in existing()) || !('createdAt' in incoming()) || incoming().createdAt == existing().createdAt) &&
+                       isValidUserProfile(incoming()) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'username', 'bio', 'interests', 'photoUrl', 'activeClanId', 'updatedAt']);
+
+      // Only the user can delete their profile
+      allow delete: if isOwner(userId) && isValidId(userId);
+    }
+
+    // Admins collection (server-managed)
+    match /admins/{adminId} {
+      allow read: if isSignedIn();
+      allow write: if false; // Server-managed only
+    }
+
+    // Clans collection (Phase 2 foundation)
+    match /clans/{clanId} {
+      allow get: if isSignedIn() && isValidId(clanId);
+      allow list: if isSignedIn();
+      allow create, update, delete: if isSignedIn(); // Will be hardened in Phase 2
+    }
+
+    // Clan Members collection (Phase 2 foundation)
+    match /clan_members/{memberId} {
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isSignedIn();
+    }
+
+    // Posts & Social Feed (Phase 2 foundation)
+    match /posts/{postId} {
+      allow get, list: if isSignedIn();
+      allow create: if isSignedIn() && incoming().authorUid == request.auth.uid;
+      allow update, delete: if isSignedIn() && existing().authorUid == request.auth.uid;
+    }
+
+    // Private Messages & Clan Messages (Phase 2 foundation)
+    match /private_messages/{messageId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /clan_messages/{messageId} {
+      allow read, write: if isSignedIn();
+    }
+
+    // Notifications (Phase 2 foundation)
+    match /notifications/{notificationId} {
+      allow read, write: if isSignedIn();
+    }
+
+    // Friend Requests & Clan Friendships (Phase 2 foundation)
+    match /friend_requests/{requestId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /clan_friendships/{friendshipId} {
+      allow read, write: if isSignedIn();
+    }
+
+    // Villages (Phase 2 foundation)
+    match /villages/{villageId} {
+      allow read, write: if isSignedIn();
+    }
+
+    // Battles (Phase 3 foundation)
+    match /battles/{battleId} {
+      allow read, write: if isSignedIn();
+    }
+  }
+}
